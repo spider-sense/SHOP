@@ -5,13 +5,13 @@ import cv2
 from pytube import YouTube
 import numpy as np
 import torch
+import json
 
 # needed libraries for YOLOv5
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS
 from yolov5.utils.torch_utils import select_device, time_sync
-from yolov5.utils.general import (LOGGER, check_file, check_img_size, check_imshow, colorstr,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
-from yolov5.utils.plots import Annotator, colors, save_one_box
+from yolov5.utils.general import (LOGGER, check_img_size, non_max_suppression, scale_coords)
+from yolov5.utils.plots import Annotator, colors
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.augmentations import letterbox
 from yolov5.utils.metrics import bbox_iou
@@ -26,7 +26,7 @@ from tf_pose_estimation.networks import get_graph_path
 # needed libraries for top-down pose-estimator
 from pose_estimation.infer import Pose
 from pose_estimation.pose.utils.utils import draw_keypoints
-from pose_estimation.pose.utils.boxes import scale_boxes, xyxy2xywh
+from pose_estimation.pose.utils.boxes import scale_boxes
 from pose_estimation.pose.utils.decode import get_final_preds, get_simdr_final_preds
 
 # importing necessary custom libraries
@@ -149,7 +149,7 @@ class SHOP:
             
             # analyzes the image
             img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                               allDet, overlap, noPose, noElbow)
+                               allDet, overlap, noPose, noElbow, os.path.splitext(savePath)[0] + ".json", save_txt)
             
             # saves the image's analysis to the project folder
             LOGGER.info(f"Saving image to {savePath}")
@@ -161,6 +161,10 @@ class SHOP:
             # makes directory then iterates over images and writes them
             os.mkdir(savePath)
             imDir = os.listdir(source)
+            # cache dir making if needed
+            cacheDir = savePath + "/detections/"
+            if save_txt:
+                os.mkdir(cacheDir)
             for i, image in enumerate(imDir):
                 if image.split(".")[-1] in IMG_FORMATS:
                     # getting the image
@@ -168,9 +172,12 @@ class SHOP:
                     LOGGER.info(f"Reading from {imPath}")
                     img = cv2.imread(imPath)
                     
+                    # making cache path
+                    cachePath = os.path.join(cacheDir, os.path.splitext(image)[0]) + ".json"
+                    
                     # analyzing the image
-                    img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det,\
-                                       allDet, overlap, noPose, noElbow)
+                    img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
                     # saves the image's analysis to the project folder
                     cv2.imwrite(savePath + "/" + image, img)
@@ -186,10 +193,19 @@ class SHOP:
             out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
             frameTrack = 0
             LOGGER.info(f"Saving to {savePath} with fps {fps}")
+            
+            # collecting cache path
+            cacheDir = os.path.splitext(savePath)[0]
+            if save_txt:
+                os.mkdir(cacheDir)
+            
             while True:
                 # tracking the frames
                 frameTrack += 1
                 LOGGER.info(f"Frame: {frameTrack}")
+                
+                # making cache path
+                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".json"
                 
                 # reading from video
                 ret, frame = cam.read()
@@ -197,7 +213,7 @@ class SHOP:
                 if ret:
                     # analyzing the image
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                                       allDet, overlap, noPose, noElbow)
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
                     # saves image to video writer
                     out.write(img)
@@ -209,6 +225,12 @@ class SHOP:
         
         # webcam analysis perform
         if isWeb:
+            # adding cache path
+            cacheDir = str(savePath)
+            if save_txt:
+                os.mkdir(cacheDir)
+            
+            # continuing with the webcam analysis
             savePath += ".mp4"
             cam = cv2.VideoCapture(0)
             imageWidth = int(cam.get(3))
@@ -223,6 +245,9 @@ class SHOP:
                 frameTrack += 1
                 LOGGER.info(f"Frame: {frameTrack}")
                 
+                # making cache path
+                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".json"
+                
                 # reading from video
                 ret, frame = cam.read()
                 
@@ -231,7 +256,7 @@ class SHOP:
                 if not (cv2.waitKey(1) & 0xFF == ord(' ')):
                     # analyzing the image
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                                       allDet, overlap, noPose, noElbow)
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
                     # saves image to video writer
                     out.write(img)
@@ -248,6 +273,9 @@ class SHOP:
             yt = YouTube(source)
             yt.streams.get_by_itag(22).download(output_path=savePath, filename="video.mp4")
             
+            # creating cacheDir
+            cacheDir = os.path.join(projectFolder, "detections")
+            
             # now analyzing the youtube video
             LOGGER.info("analyzing the youtube video")
             cam = cv2.VideoCapture(savePath + "video.mp4")
@@ -259,10 +287,16 @@ class SHOP:
             out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
             frameTrack = 0
             LOGGER.info(f"saving video to {savePath} with {fps} frames")
+            if save_txt:
+                LOGGER.info(f"saving results to {cacheDir}")
+                os.mkdir(cacheDir)
             while True:
                 # tracking the frames
                 frameTrack += 1
                 LOGGER.info(f"Frame: {frameTrack}")
+                
+                # creating cache path
+                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".json"
                 
                 # reading from video
                 ret, frame = cam.read()
@@ -271,7 +305,7 @@ class SHOP:
                 if ret:
                     # analyzing the image
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                                       allDet, overlap, noPose, noElbow)
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
                     # saves image to video writer
                     out.write(img)
@@ -302,7 +336,9 @@ class SHOP:
                 allDet,
                 overlap,
                 noPose,
-                noElbow):
+                noElbow,
+                savePath,
+                saveTxt):
         # starting to time the function execution
         t0 = time_sync()
         full = time_sync()
@@ -344,16 +380,16 @@ class SHOP:
                 # ensuring check boxes are ready for comparison and rescaled
                 checkBoxes = self.readyCheckBoxes(checkBoxes, img, image, self.device)  
             
-                # removing non-handheld classes (COCO-specific setting)
-                if handheld:
-                    det = [i for i in det if HANDHELD_MAP.get(int(i[5]))]
-            
                 # filtering low confidence detections with areas of interest   
                 if not allDet:
                     newDet = self.filterDet(checkBoxes, det, image, img, tensorImg, upper_conf_thres, overlap)
                 else:
                     # if allDet is True, then it doesn't filter any detections as there is no need to
                     newDet = det
+                
+                # removing non-handheld classes (COCO-specific setting)
+                if handheld:
+                    newDet = [i for i in newDet if int(i[5]) in HANDHELD_MAP]
                 
                 # creating the annotation tool
                 annotator = Annotator(image, line_width=line_thickness, example=str(self.names))
@@ -380,7 +416,11 @@ class SHOP:
                 else:
                     draw_keypoints(image, humans, self.top_down.coco_skeletons) 
             
-            # returning annotated image
+            # returning annotated image and caching path if needed
+            if saveTxt:
+                LOGGER.info(f"Saving results to {savePath}")
+                with open(savePath, 'w') as file:
+                    file.write(json.dumps([det.tolist() for det in newDet]))
             LOGGER.info(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
             return image
         else:
@@ -417,16 +457,16 @@ class SHOP:
                 
                 checkBoxes = self.readyCheckBoxes(checkBoxes, img, image, self.device)  
             
-                # removing non-handheld classes (COCO-specific setting)
-                if handheld:
-                    det = [i for i in det if HANDHELD_MAP.get(int(i[5]))]
-            
                 # filtering low confidence detections with areas of interest   
-                if not allDet or upperConfNotExceeded:
+                if (not allDet) and upperConfNotExceeded:
                     newDet = self.filterDet(checkBoxes, det, image, img, tensorImg, upper_conf_thres, overlap)
                 else:
                     # if allDet is True, then it doesn't filter any detections as there is no need to
-                    newDet = det
+                    newDet = det if not handheld else [detection for detection in det if int(detection[5]) in HANDHELD_MAP]
+                
+                # removing non-handheld classes (COCO-specific setting)
+                if handheld:
+                    newDet = [i for i in newDet if int(i[5]) in HANDHELD_MAP]
                 
                 # creating the annotation tool
                 annotator = Annotator(image, line_width=line_thickness, example=str(self.names))
@@ -453,7 +493,10 @@ class SHOP:
                 else:
                     draw_keypoints(image, humans, self.top_down.coco_skeletons) 
             
-            # Returning the annotated image
+            # Returning the annotated image and caching path if needed
+            if saveTxt:
+                with open(savePath, 'w') as file:
+                    file.write(json.dumps([det.tolist() for det in newDet]))
             LOGGER.info(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
             return image
     
