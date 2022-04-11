@@ -179,7 +179,9 @@ def main(CONF_THRESH, det_label_dir, iou_thresh):
     r = tp / (tp + fn + 0.00001)
     AR = np.sum(tp) / (np.sum(tp) + fN + 0.00001)
     #xAR = np.sum(tp) / (np.sum(tp) + np.sum(fn) + 0.00001)
-    #"""
+    
+    # uncomment if you would like to see specific stats at any given confidence threshold
+    """
     if CONF_THRESH in [0.25]:
         print("confidence", CONF_THRESH)
         #print('P per class', p)
@@ -202,98 +204,138 @@ if __name__ == '__main__':
     ax.set_ylabel("precision")
     ax.set_xlabel("recall")
     ax.set_ylim([0, 1])
-    #sizes = ["", "Mid", "Large"]
-    sizes = ["Mid"]
+    sizes = ["", "Mid", "Large"]
     poseModels = ["", "Td"]
-    #poseModels = ["", "Td"]
-    #uppers = ["", "70.0", "80.0"]
     uppers = ["", "70"]
-    #labels = ["det", "upperPoseOverlap", "poseNoUpper"]
-    laps = ["", "Overlap"]
-    #labels = ["det", "poseNoUpper", "upperPose"]
     labels = ["det", "poseNoUpper"]
     blur = ["", "Deblur"]
     splits = 20
     confThres = [i/splits for i in list(range(splits))]
-    #confThres = [0]
     
     ################## Getting handheld and G.T. jsons #########
     allLabels = {}
     with open("./labels/allLabels.json", 'r') as file:
         allLabels = json.loads(file.read())
     ############################################################    
+    for label in os.listdir(labelDir):
+        # early exiting conditions
+        if label in ["handheld", "ground_truth", "allLabels.json"]:
+            continue
+        
+        # looking for existing stats else making new
+        if not os.path.isdir("./" + labelDir + "/" + label + "/"):
+            continue
+        if os.path.isfile("testRes/" + label + ".json"):
+            with open("testRes/" + label + ".json", 'r') as file:
+                scatter = json.loads(file.read())
+            scatter1 = scatter[0]
+            scatter2 = scatter[1]
+            #scatter2.pop(0)
+            newScatter = list(zip(scatter[0], scatter[1]))
+            newScatter.append(scatter[2])
+            scatter = newScatter
+        else:
+            print(label)
+            print(confThres)
+            t0 = time.time()
+            scatter = [main(i, "./" + labelDir + "/" + label + "/", IOU_THRESH) for i in confThres]
+            print("Time Needed", time.time() - t0)
+            scatter1 = [i[0] for i in scatter]
+            scatter2 = [i[1] for i in scatter]
+            tpTracks = [i[2] for i in scatter]
+            
+            scatter = [scatter1, scatter2, tpTracks]
+            with open("testRes/" + label + ".json", 'w') as file:
+                file.write(json.dumps(scatter))
+                
+        # scattering annotation plots and mAP
+        ax.scatter(scatter2, scatter1, label=label)
+        scatter2.insert(0, 0)
+        mAP = []
+        for i in range(1, splits+1):
+            mAP.append(scatter1[i-1] * (scatter2[i-1]-scatter2[i]))
+            
+        # uncomment if you want the confidences to be labelled
+        #for i in range(len(scatter1)):
+         #   ax.annotate(str(confThres[i]), xy = [scatter2[i], scatter1[i]])
+        ax.grid()
+        
+        # Adding a legend
+        ax.legend(bbox_to_anchor=(1.0, 1.0))
+        print("mAP:", label, sum(mAP))
+        print()
     
-    """
-    sizes = ["", "Mid", "Large"]
-    labels = ["det", "cmuPose", "pose", "poseNoOuter", "poseWithOuterDet", "poseNoElbow", "crop"]
-    #"""
+    
+    
     for l in labels:
         for m in poseModels:
             for u in uppers:
                 for size in sizes:
-                    for o in laps:
-                        for b in blur:
-                            label = l + o + m + u + size + b
-                            # looking for existing stats else making new
-                            if not os.path.isdir("./" + labelDir + "/" + label + "/"):
-                                continue
-                            if os.path.isfile("testRes/" + label + ".json"):
-                                with open("testRes/" + label + ".json", 'r') as file:
-                                    scatter = json.loads(file.read())
-                                scatter1 = scatter[0]
-                                scatter2 = scatter[1]
-                                #scatter2.pop(0)
-                                newScatter = list(zip(scatter[0], scatter[1]))
-                                newScatter.append(scatter[2])
-                                scatter = newScatter
-                            else:
-                                print(label)
-                                print(confThres)
-                                t0 = time.time()
-                                scatter = [main(i, "./" + labelDir + "/" + label + "/", IOU_THRESH) for i in confThres]
-                                print("Time Needed", time.time() - t0)
-                                scatter1 = [i[0] for i in scatter]
-                                scatter2 = [i[1] for i in scatter]
-                                tpTracks = [i[2] for i in scatter]
-                                
-                                scatter = [scatter1, scatter2, tpTracks]
-                                with open("testRes/" + label + ".json", 'w') as file:
-                                    file.write(json.dumps(scatter))
+                    for b in blur:
+                        label = l + m + u + size + b
+                        # looking for existing stats else making new
+                        if not os.path.isdir("./" + labelDir + "/" + label + "/"):
+                            continue
+                        if os.path.isfile("testRes/" + label + ".json"):
+                            with open("testRes/" + label + ".json", 'r') as file:
+                                scatter = json.loads(file.read())
+                            scatter1 = scatter[0]
+                            scatter2 = scatter[1]
+                            #scatter2.pop(0)
+                            newScatter = list(zip(scatter[0], scatter[1]))
+                            newScatter.append(scatter[2])
+                            scatter = newScatter
+                        else:
+                            print(label)
+                            print(confThres)
+                            t0 = time.time()
+                            scatter = [main(i, "./" + labelDir + "/" + label + "/", IOU_THRESH) for i in confThres]
+                            print("Time Needed", time.time() - t0)
+                            scatter1 = [i[0] for i in scatter]
+                            scatter2 = [i[1] for i in scatter]
+                            tpTracks = [i[2] for i in scatter]
                             
-                            # Getting TP, FP, and FN tracks
-                            if l != "det":
-                                tpTracks = scatter[-1]
-                                with open("testRes/det" + size + ".json", 'r') as file:
-                                    detScatter = json.loads(file.read())
-                                detTracks = detScatter[-1]
-                                tpRates, fpRates = [], []
-                                conf = 1
-                                i = 0
-                                for det, tp in zip(detTracks, tpTracks):
-                                    if i == conf * 20:
-                                        continue
-                                    i += 1
-                                    tpRates.append(tp[0] / (det[0] + 0.0001))
-                                    fpRates.append(tp[1] / (det[1] + 0.0001))
-                                    break
-                                print("TP filter rate",  1 - sum(tpRates) / len(tpRates))
-                                print("FP filter rate", 1 - sum(fpRates) / len(fpRates))
+                            scatter = [scatter1, scatter2, tpTracks]
+                            with open("testRes/" + label + ".json", 'w') as file:
+                                file.write(json.dumps(scatter))
+                        
+                        # Getting TP, FP, and FN tracks
+                        if l != "det":
+                            tpTracks = scatter[-1]
+                            with open("testRes/det" + size + ".json", 'r') as file:
+                                detScatter = json.loads(file.read())
+                            detTracks = detScatter[-1]
+                            tpRates, fpRates = [], []
+                            conf = 1
+                            i = 0
+                            for det, tp in zip(detTracks, tpTracks):
+                                if i == conf * 20:
+                                    continue
+                                i += 1
+                                tpRates.append(tp[0] / (det[0] + 0.0001))
+                                fpRates.append(tp[1] / (det[1] + 0.0001))
+                                break
+                            print("TP filter rate",  1 - sum(tpRates) / len(tpRates))
+                            print("FP filter rate", 1 - sum(fpRates) / len(fpRates))
+                        
+                        # scattering annotation plots and mAP
+                        ax.scatter(scatter2, scatter1, label=label)
+                        scatter2.insert(0, 0)
+                        mAP = []
+                        for i in range(1, splits+1):
+                            mAP.append(scatter1[i-1] * (scatter2[i-1]-scatter2[i]))
                             
-                            # scattering annotation plots and mAP
-                            ax.scatter(scatter2, scatter1, label=label)
-                            scatter2.insert(0, 0)
-                            mAP = []
-                            for i in range(1, splits+1):
-                                mAP.append(scatter1[i-1] * (scatter2[i-1]-scatter2[i]))
-                            #for i in range(len(scatter1)):
-                             #   ax.annotate(str(confThres[i]), xy = [scatter2[i], scatter1[i]])
-                            ax.grid()
-                            
-                            # Adding a legend
-                            ax.legend(bbox_to_anchor=(1.0, 1.0))
-                            print("mAP:", label, sum(mAP))
-                            print()
+                        # uncomment if you want the confidences to be labelled
+                        #for i in range(len(scatter1)):
+                         #   ax.annotate(str(confThres[i]), xy = [scatter2[i], scatter1[i]])
+                        ax.grid()
+                        
+                        # Adding a legend
+                        ax.legend(bbox_to_anchor=(1.0, 1.0))
+                        print("mAP:", label, sum(mAP))
+                        print()
     
+    # saves a graph of the comparison to your folder
     plt.savefig("comparison_graph.jpg", dpi=300)
     
 #print(existLabel)
