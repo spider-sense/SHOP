@@ -6,17 +6,17 @@ Created on Mon Aug 16 02:45:31 2021
 
 import numpy as np
 import os
-from utils.general import xywhn2xyxy
 import cv2
 import matplotlib.pyplot as plt
 import json
 import time
+import torch
 
 name = 'det'
 labelDir = "labels"
 coco_label_dir = './' + labelDir + '/ground_truth/'
 hh_label_dir = './' + labelDir + '/handheld/'
-images_dir = './coco/images/'
+images_dir = './images/'
 
 hh_fnames = os.listdir(hh_label_dir)
 handheld_map = {29: 'frisbee', 32: 'sports ball', 35: 'baseball glove', 39: 'bottle', 40: 'wine glass', 41: 'cup', 42: 'fork', 43: 'knife', 44: 'spoon', 46: 'banana', 47: 'apple', 48: 'sandwich', 49: 'orange', 50: 'broccoli', 51: 'carrot', 52: 'hot dog', 53: 'pizza', 54: 'donut', 64: 'mouse', 65: 'remote', 67: 'cell phone', 73: 'book', 76: 'scissors', 77: 'teddy bear', 78: 'hair drier', 79: 'toothbrush'}
@@ -26,6 +26,15 @@ IOU_THRESH = 0.5
 if not os.path.isfile(labelDir + "results.json"):
     with open(labelDir + "results.json", 'w') as file:
         file.write(json.dumps({}))
+
+def xywhn2xyxy(x, w=640, h=640, padw=0, padh=0):
+    # Convert nx4 boxes from [x, y, w, h] normalized to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[:, 0] = w * (x[:, 0] - x[:, 2] / 2) + padw  # top left x
+    y[:, 1] = h * (x[:, 1] - x[:, 3] / 2) + padh  # top left y
+    y[:, 2] = w * (x[:, 0] + x[:, 2] / 2) + padw  # bottom right x
+    y[:, 3] = h * (x[:, 1] + x[:, 3] / 2) + padh  # bottom right y
+    return y
     
 def bbox_iou(boxA, boxB):    
     # determine the (x, y)-coordinates of the intersection rectangle
@@ -212,10 +221,20 @@ if __name__ == '__main__':
     with open("./labels/allLabels.json", 'r') as file:
         allLabels = json.loads(file.read())
     ############################################################    
+    
+    # can only have specific size results be displayed
+    sizes = ["", "Mid", "Large"]
     for label in os.listdir(labelDir):
         # early exiting conditions
         if label in ["handheld", "ground_truth", "allLabels.json"]:
             continue
+        invalid = True
+        for size in sizes:
+            if size in label:
+                invalid = False
+        if invalid:
+            continue
+        
         
         # looking for existing stats else making new
         if not os.path.isdir("./" + labelDir + "/" + label + "/"):

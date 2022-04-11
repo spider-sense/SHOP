@@ -5,6 +5,7 @@ import cv2
 from pytube import YouTube
 import numpy as np
 import torch
+from tqdm import tqdm
 
 # needed libraries for YOLOv5
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS
@@ -165,7 +166,7 @@ class SHOP:
             cacheDir = savePath + "/detections/"
             if save_txt:
                 os.mkdir(cacheDir)
-            for i, image in enumerate(imDir):
+            for i, image in tqdm(enumerate(imDir)):
                 if image.split(".")[-1] in IMG_FORMATS:
                     # getting the image
                     imPath = os.path.join(source, image)
@@ -506,7 +507,7 @@ class SHOP:
                 if Openpose:
                     image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
                 else:
-                    draw_keypoints(image, humans, self.top_down.coco_skeletons) 
+                    draw_keypoints(image, img, humans, self.top_down.coco_skeletons) 
             
             # Returning the annotated image and caching path if needed
             if saveTxt:
