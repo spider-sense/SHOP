@@ -5,12 +5,11 @@ import cv2
 from pytube import YouTube
 import numpy as np
 import torch
-import json
 
 # needed libraries for YOLOv5
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS
 from yolov5.utils.torch_utils import select_device, time_sync
-from yolov5.utils.general import (LOGGER, check_img_size, non_max_suppression, scale_coords)
+from yolov5.utils.general import (LOGGER, check_img_size, non_max_suppression, scale_coords, xyxy2xywh)
 from yolov5.utils.plots import Annotator, colors
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.augmentations import letterbox
@@ -149,11 +148,12 @@ class SHOP:
             
             # analyzes the image
             img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                               allDet, overlap, noPose, noElbow, os.path.splitext(savePath)[0] + ".json", save_txt)
+                               allDet, overlap, noPose, noElbow, os.path.splitext(savePath)[0] + ".txt", save_txt)
             
-            # saves the image's analysis to the project folder
-            LOGGER.info(f"Saving image to {savePath}")
-            cv2.imwrite(savePath, img)
+            # saves the image's analysis to the project folder as long as nosave not enabled
+            if not nosave:
+                LOGGER.info(f"Saving image to {savePath}")
+                cv2.imwrite(savePath, img)
             return
             
         # directory of images analysis perform
@@ -173,14 +173,16 @@ class SHOP:
                     img = cv2.imread(imPath)
                     
                     # making cache path
-                    cachePath = os.path.join(cacheDir, os.path.splitext(image)[0]) + ".json"
+                    cachePath = os.path.join(cacheDir, os.path.splitext(image)[0]) + ".txt"
                     
                     # analyzing the image
                     img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
                     # saves the image's analysis to the project folder
-                    cv2.imwrite(savePath + "/" + image, img)
+                    if not nosave:
+                        LOGGER.info(f"Saving image to {savePath}")
+                        cv2.imwrite(savePath + "/" + image, img)
             return
                 
         # video analysis perform
@@ -190,9 +192,10 @@ class SHOP:
             imageHeight = int(cam.get(4))
             fps = cam.get(cv2.CAP_PROP_FPS)
             fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-            out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
+            if not nosave:
+                out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
+                LOGGER.info(f"Saving to {savePath} with fps {fps}")
             frameTrack = 0
-            LOGGER.info(f"Saving to {savePath} with fps {fps}")
             
             # collecting cache path
             cacheDir = os.path.splitext(savePath)[0]
@@ -205,7 +208,7 @@ class SHOP:
                 LOGGER.info(f"Frame: {frameTrack}")
                 
                 # making cache path
-                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".json"
+                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".txt"
                 
                 # reading from video
                 ret, frame = cam.read()
@@ -215,11 +218,13 @@ class SHOP:
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
-                    # saves image to video writer
-                    out.write(img)
+                    if not nosave:
+                        # saves image to video writer if enabled
+                        out.write(img)
                 else:
                     break
-            out.release()
+            if not nosave:
+                out.release()
             cam.release()
             return
         
@@ -237,7 +242,8 @@ class SHOP:
             imageHeight = int(cam.get(4))
             fps = cam.get(cv2.CAP_PROP_FPS)
             fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-            out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
+            if not nosave:
+                out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
             frameTrack = 0
             LOGGER.info(f"saving webcam to path {savePath} with {fps}")
             while True:
@@ -246,7 +252,7 @@ class SHOP:
                 LOGGER.info(f"Frame: {frameTrack}")
                 
                 # making cache path
-                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".json"
+                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".txt"
                 
                 # reading from video
                 ret, frame = cam.read()
@@ -258,11 +264,13 @@ class SHOP:
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
-                    # saves image to video writer
-                    out.write(img)
+                    if not nosave:
+                        # saves image to video writer
+                        out.write(img)
                 else:
                     break
-            out.release()
+            if not nosave:
+                out.release()
             cam.release()
               
         # youtube video analysis perform
@@ -284,7 +292,8 @@ class SHOP:
             imageHeight = int(cam.get(4))
             fps = cam.get(cv2.CAP_PROP_FPS)
             fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-            out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
+            if not nosave:
+                out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
             frameTrack = 0
             LOGGER.info(f"saving video to {savePath} with {fps} frames")
             if save_txt:
@@ -296,7 +305,7 @@ class SHOP:
                 LOGGER.info(f"Frame: {frameTrack}")
                 
                 # creating cache path
-                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".json"
+                cachePath = os.path.join(cacheDir, str(frameTrack)) + ".txt"
                 
                 # reading from video
                 ret, frame = cam.read()
@@ -307,11 +316,13 @@ class SHOP:
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt)
                     
-                    # saves image to video writer
-                    out.write(img)
+                    if not nosave:
+                        # saves image to video writer
+                        out.write(img)
                 else:
                     break
-            out.release()
+            if not nosave:
+                out.release()
             cam.release()
             
         # printing out final save path
@@ -414,13 +425,17 @@ class SHOP:
                 if Openpose:
                     image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
                 else:
-                    draw_keypoints(image, humans, self.top_down.coco_skeletons) 
+                    draw_keypoints(image, img, humans, self.top_down.coco_skeletons) 
             
             # returning annotated image and caching path if needed
             if saveTxt:
+                gn = torch.tensor(image.shape)[[1, 0, 1, 0]]  # normalization gain whwh
                 LOGGER.info(f"Saving results to {savePath}")
-                with open(savePath, 'w') as file:
-                    file.write(json.dumps([det.tolist() for det in newDet]))
+                for *xyxy, conf, cls in reversed(newDet):
+                    xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                    line = (cls, *xywh, conf)  # label format
+                    with open(savePath, 'a') as f:
+                        f.write(('%g ' * len(line)).rstrip() % line + '\n')
             LOGGER.info(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
             return image
         else:
@@ -495,8 +510,13 @@ class SHOP:
             
             # Returning the annotated image and caching path if needed
             if saveTxt:
-                with open(savePath, 'w') as file:
-                    file.write(json.dumps([det.tolist() for det in newDet]))
+                gn = torch.tensor(image.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+                LOGGER.info(f"Saving results to {savePath}")
+                for *xyxy, conf, cls in reversed(newDet):
+                    xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                    line = (cls, *xywh, conf)  # label format
+                    with open(savePath, 'a') as f:
+                        f.write(('%g ' * len(line)).rstrip() % line + '\n')
             LOGGER.info(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
             return image
     
@@ -754,6 +774,7 @@ class SHOP:
         if len(img.shape) == 3:
             img = img[None]
         return img
+
 
 # runs inference with desired options
 if __name__ == "__main__":
