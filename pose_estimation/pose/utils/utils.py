@@ -27,14 +27,20 @@ def draw_coco_keypoints(img, keypoints, skeletons):
                 cv2.line(image, (x1, y1), (x2, y2), (0, 255, 0), 2)   
     return image 
 
-
-def draw_keypoints(img, keypoints, skeletons):
+"""
+Added some scaling to this keypoint drawing algorithm
+"""
+def draw_keypoints(img, letterboxImg, keypoints, skeletons):
     if keypoints == []: return img
+    widthFactor = img.shape[1] / letterboxImg.shape[1]
+    heightFactor = img.shape[0] / letterboxImg.shape[0]
     for kpts in keypoints:
         for x, y in kpts:
-            cv2.circle(img, (x, y), 4, (255, 0, 0), 2, cv2.LINE_AA)
+            cv2.circle(img, (round(x*widthFactor), round(y*heightFactor)), 4, (255, 0, 0), 2, cv2.LINE_AA)
         for kid1, kid2 in skeletons:
-            cv2.line(img, kpts[kid1-1], kpts[kid2-1], (0, 255, 0), 2, cv2.LINE_AA)   
+            kid1Kpt = [round(kpts[kid1-1][0]*widthFactor), round(kpts[kid1-1][1]*heightFactor)]
+            kid2Kpt = [round(kpts[kid2-1][0]*widthFactor), round(kpts[kid2-1][1]*heightFactor)]
+            cv2.line(img, kid1Kpt, kid2Kpt, (0, 255, 0), 2, cv2.LINE_AA)   
 
 
 class WebcamStream:
