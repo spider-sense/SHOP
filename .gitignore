@@ -1,6 +1,7 @@
 *.pt
 *.h5
 *.pth
-_pycache_/*
+__pycache__/*
+pose_estimation/pose/utils/__pycache__/*
 *.pyc
 *.pyo

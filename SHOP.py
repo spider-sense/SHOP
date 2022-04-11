@@ -5,7 +5,6 @@ import cv2
 from pytube import YouTube
 import numpy as np
 import torch
-import json
 
 # needed libraries for YOLOv5
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS
