@@ -1,3 +1,10 @@
 *.pt
 *.h5
 *.pth
+_pycache_/*
+DeblurGANv2/_pycache_/*
+pose_estimation/_pycache_/*
+pose_estimation/pose/_pycache_/*
+yolov5/_pycache_/*
+yolov5/models/_pycache_/*
+yolov5/utils/_pycache/*
