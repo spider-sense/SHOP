@@ -365,7 +365,6 @@ class SHOP:
         deblurTime = time_sync() - t0
         
         # keypoints found first if upper confidence threshold > 1
-        self.model.warmup(imgsz=(1, 3, *imgsz))  # warmup
         if upper_conf_thres > 1:
             # collecting pose keypoints, center keypoints + distances, and which pose-estimator was used
             t1 = time_sync()
@@ -386,6 +385,9 @@ class SHOP:
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
             detTimes = time_sync() - t2
             
+            # starts timing the post-processing and annotating
+            t3 = time_sync()
+
             # process and filter the detections
             for i, det in enumerate(pred):  # detections per image
                 # ensuring check boxes and detections are ready for comparison and rescaled
@@ -440,7 +442,7 @@ class SHOP:
                     line = (cls, *xywh, conf)  # label format
                     with open(savePath, 'a') as f:
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
-            print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
+            print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s | Postprocessing {time_sync()-t3:.3f}s")
             return image
         else:
             # Collecting all detections
@@ -470,6 +472,9 @@ class SHOP:
                 checkBoxes = []
             aoiTime = time_sync() - t2
             
+            # starts timing the post-processing and annotating
+            t3 = time_sync()
+
             # finally processing and filtering the detections
             for i, det in enumerate(pred):  # detections per image
                 # ensuring check boxes and detections are ready for comparison and rescaled
@@ -524,7 +529,7 @@ class SHOP:
                     line = (cls, *xywh, conf)  # label format
                     with open(savePath, 'a') as f:
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
-            print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
+            print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | Detection: {detTimes:.3f}s | AOI Gen.: {aoiTime:.3f}s | Postprocessing: {time_sync()-t3:.3f}")
             return image
     
     
