@@ -12,6 +12,8 @@ labels = os.listdir("labels")
 allLabels = {}
 for name in labels:
     print(name)
+    if name == "allLabels.json":
+        continue
     handJson = {}
     handDir = os.listdir("./labels/" + name)
     for hand in handDir:

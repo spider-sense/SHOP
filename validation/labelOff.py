@@ -190,7 +190,7 @@ def main(CONF_THRESH, det_label_dir, iou_thresh):
     #xAR = np.sum(tp) / (np.sum(tp) + np.sum(fn) + 0.00001)
     
     # uncomment if you would like to see specific stats at any given confidence threshold
-    """
+    #"""
     if CONF_THRESH in [0.25]:
         print("confidence", CONF_THRESH)
         #print('P per class', p)
@@ -223,18 +223,10 @@ if __name__ == '__main__':
     ############################################################    
     
     # can only have specific size results be displayed
-    sizes = ["", "Mid", "Large"]
     for label in os.listdir(labelDir):
         # early exiting conditions
         if label in ["handheld", "ground_truth", "allLabels.json"]:
-            continue
-        invalid = True
-        for size in sizes:
-            if size in label:
-                invalid = False
-        if invalid:
-            continue
-        
+            continue        
         
         # looking for existing stats else making new
         if not os.path.isdir("./" + labelDir + "/" + label + "/"):

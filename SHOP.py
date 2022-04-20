@@ -10,7 +10,7 @@ from tqdm import tqdm
 # needed libraries for YOLOv5
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS
 from yolov5.utils.torch_utils import select_device, time_sync
-from yolov5.utils.general import (LOGGER, check_img_size, non_max_suppression, scale_coords, xyxy2xywh)
+from yolov5.utils.general import (check_img_size, non_max_suppression, scale_coords, xyxy2xywh)
 from yolov5.utils.plots import Annotator, colors
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.augmentations import letterbox
@@ -57,6 +57,8 @@ class SHOP:
         # Generating yolov5 model
         self.device = select_device(device)
         self.model = DetectMultiBackend(weights, device=self.device, dnn=dnn, data=data)
+        if half:
+            self.model.half()
         self.stride, self.names, self.pt, self.jit, self.onnx, self.engine = self.model.stride, self.model.names, self.model.pt, self.model.jit, self.model.onnx, self.model.engine
         self.augment = augment
         
@@ -119,7 +121,8 @@ class SHOP:
               wsl,
               imgsz,
               max_det,
-              handheld):        
+              handheld,
+              noCheck):        
         # Checking and verifying source type
         isDir = os.path.isdir(source)
         isIm = os.path.isfile(source) and source.split(".")[-1] in IMG_FORMATS
@@ -149,11 +152,11 @@ class SHOP:
             
             # analyzes the image
             img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                               allDet, overlap, noPose, noElbow, os.path.splitext(savePath)[0] + ".txt", save_txt)
+                               allDet, overlap, noPose, noElbow, os.path.splitext(savePath)[0] + ".txt", save_txt, noCheck, visualize)
             
             # saves the image's analysis to the project folder as long as nosave not enabled
             if not nosave:
-                LOGGER.info(f"Saving image to {savePath}")
+                print(f"Saving image to {savePath}")
                 cv2.imwrite(savePath, img)
             return
             
@@ -170,7 +173,7 @@ class SHOP:
                 if image.split(".")[-1] in IMG_FORMATS:
                     # getting the image
                     imPath = os.path.join(source, image)
-                    LOGGER.info(f"Reading from {imPath}")
+                    print(f"Reading from {imPath}")
                     img = cv2.imread(imPath)
                     
                     # making cache path
@@ -178,11 +181,11 @@ class SHOP:
                     
                     # analyzing the image
                     img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
                     
                     # saves the image's analysis to the project folder
                     if not nosave:
-                        LOGGER.info(f"Saving image to {savePath}")
+                        print(f"Saving image to {savePath}")
                         cv2.imwrite(savePath + "/" + image, img)
             return
                 
@@ -195,7 +198,7 @@ class SHOP:
             fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
             if not nosave:
                 out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
-                LOGGER.info(f"Saving to {savePath} with fps {fps}")
+                print(f"Saving to {savePath} with fps {fps}")
             frameTrack = 0
             
             # collecting cache path
@@ -206,7 +209,7 @@ class SHOP:
             while True:
                 # tracking the frames
                 frameTrack += 1
-                LOGGER.info(f"Frame: {frameTrack}")
+                print(f"Frame: {frameTrack}")
                 
                 # making cache path
                 cachePath = os.path.join(cacheDir, str(frameTrack)) + ".txt"
@@ -217,7 +220,7 @@ class SHOP:
                 if ret:
                     # analyzing the image
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
                     
                     if not nosave:
                         # saves image to video writer if enabled
@@ -246,11 +249,11 @@ class SHOP:
             if not nosave:
                 out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
             frameTrack = 0
-            LOGGER.info(f"saving webcam to path {savePath} with {fps}")
+            print(f"saving webcam to path {savePath} with {fps}")
             while True:
                 # tracking the frames
                 frameTrack += 1
-                LOGGER.info(f"Frame: {frameTrack}")
+                print(f"Frame: {frameTrack}")
                 
                 # making cache path
                 cachePath = os.path.join(cacheDir, str(frameTrack)) + ".txt"
@@ -263,7 +266,7 @@ class SHOP:
                 if not (cv2.waitKey(1) & 0xFF == ord(' ')):
                     # analyzing the image
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
                     
                     if not nosave:
                         # saves image to video writer
@@ -277,7 +280,7 @@ class SHOP:
         # youtube video analysis perform
         if isYouTube:
             # saving the youtube video
-            LOGGER.info("downloading the youtube video")
+            print("downloading the youtube video")
             savePath = projectFolder
             yt = YouTube(source)
             yt.streams.get_by_itag(22).download(output_path=savePath, filename="video.mp4")
@@ -286,7 +289,7 @@ class SHOP:
             cacheDir = os.path.join(projectFolder, "detections")
             
             # now analyzing the youtube video
-            LOGGER.info("analyzing the youtube video")
+            print("analyzing the youtube video")
             cam = cv2.VideoCapture(savePath + "video.mp4")
             savePath = projectFolder + "analyzedVideo.mp4"
             imageWidth = int(cam.get(3))
@@ -296,14 +299,14 @@ class SHOP:
             if not nosave:
                 out = cv2.VideoWriter(savePath, fourcc, fps, (imageWidth, imageHeight))
             frameTrack = 0
-            LOGGER.info(f"saving video to {savePath} with {fps} frames")
+            print(f"saving video to {savePath} with {fps} frames")
             if save_txt:
-                LOGGER.info(f"saving results to {cacheDir}")
+                print(f"saving results to {cacheDir}")
                 os.mkdir(cacheDir)
             while True:
                 # tracking the frames
                 frameTrack += 1
-                LOGGER.info(f"Frame: {frameTrack}")
+                print(f"Frame: {frameTrack}")
                 
                 # creating cache path
                 cachePath = os.path.join(cacheDir, str(frameTrack)) + ".txt"
@@ -315,7 +318,7 @@ class SHOP:
                 if ret:
                     # analyzing the image
                     img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
-                                       allDet, overlap, noPose, noElbow, cachePath, save_txt)
+                                       allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
                     
                     if not nosave:
                         # saves image to video writer
@@ -327,8 +330,8 @@ class SHOP:
             cam.release()
             
         # printing out final save path
-        if not isYouTube:
-            LOGGER.info(f"Saving to {savePath}")
+        if isYouTube:
+            print(f"Saving to {savePath}")
     
             
     """
@@ -350,23 +353,19 @@ class SHOP:
                 noPose,
                 noElbow,
                 savePath,
-                saveTxt):
+                saveTxt,
+                noCheck,
+                visualize):
         # starting to time the function execution
         t0 = time_sync()
         full = time_sync()
         
-        # letterboxing the image
-        img = letterbox(image, imgsz, stride=self.stride)[0]
-        
-        # running deblurring if noDeblur is off
-        if not self.noDeblur:
-            img = self.predictor(img, None)        
-        
-        # creating the tensor image
-        tensorImg = self.preprocess(img, imgsz)
+        # running preprocessing
+        tensorImg, img = self.preprocess(image, imgsz)
         deblurTime = time_sync() - t0
         
         # keypoints found first if upper confidence threshold > 1
+        self.model.warmup(imgsz=(1, 3, *imgsz))  # warmup
         if upper_conf_thres > 1:
             # collecting pose keypoints, center keypoints + distances, and which pose-estimator was used
             t1 = time_sync()
@@ -374,7 +373,7 @@ class SHOP:
             
             # early exits if no keypoints were found
             if len(keypoints) == 0:
-                LOGGER.info("lack of keypoints causes early exit")
+                print("lack of keypoints causes early exit")
                 return image
             
             # now collects the check boxes
@@ -383,14 +382,17 @@ class SHOP:
             
             # runs the detection itself
             t2 = time_sync()
-            pred = self.model(tensorImg, augment=self.augment)
+            pred = self.model(tensorImg, augment=self.augment, visualize=visualize)
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
             detTimes = time_sync() - t2
             
             # process and filter the detections
             for i, det in enumerate(pred):  # detections per image
-                # ensuring check boxes are ready for comparison and rescaled
+                # ensuring check boxes and detections are ready for comparison and rescaled
                 checkBoxes = self.readyCheckBoxes(checkBoxes, img, image, self.device)  
+                if len(det):
+                    # Rescale boxes from img_size to image size and same thing done for check boxes
+                    det[:, :4] = scale_coords(tensorImg.shape[2:], det[:, :4], image.shape).round()
             
                 # filtering low confidence detections with areas of interest   
                 if not allDet:
@@ -398,7 +400,7 @@ class SHOP:
                 else:
                     # if allDet is True, then it doesn't filter any detections as there is no need to
                     newDet = det
-                
+
                 # removing non-handheld classes (COCO-specific setting)
                 if handheld:
                     newDet = [i for i in newDet if int(i[5]) in HANDHELD_MAP]
@@ -412,16 +414,17 @@ class SHOP:
                     label = f'{self.names[c]} {conf:.2f}'
                     annotator.box_label(xyxy, label, color=colors(c, True))
             
-                # drawing out the check boxes and pose-estimators
-                i = 0
-                for *xyxy, conf, cls in reversed(checkBoxes):
-                    c = int(cls)
-                    if xyxy[3] - xyxy[1] > 0 and xyxy[2] - xyxy[0] > 0:
-                        #save_one_box(xyxy, imc, file=save_dir/ 'wrist_crops' / names[c] / f'{p.stem}.jpg', BGR=True, pad=0)
-                        annotator.box_label(xyxy, keypoints[i][-1], color=colors(c, True))
-                    i += 1
+                # drawing out the check boxes and pose-estimators if noCheck disabled
+                if not noCheck:
+                    i = 0
+                    for *xyxy, conf, cls in reversed(checkBoxes):
+                        c = int(cls)
+                        if xyxy[3] - xyxy[1] > 0 and xyxy[2] - xyxy[0] > 0:
+                            #save_one_box(xyxy, imc, file=save_dir/ 'wrist_crops' / names[c] / f'{p.stem}.jpg', BGR=True, pad=0)
+                            annotator.box_label(xyxy, keypoints[i][-1], color=colors(c, True))
+                        i += 1
             
-            # Drawing the pose-estimators
+            # Drawing the pose-estimators if needed
             if not noPose:
                 if Openpose:
                     image = TfPoseEstimator.draw_humans(image, humans, imgcopy=False)
@@ -431,18 +434,18 @@ class SHOP:
             # returning annotated image and caching path if needed
             if saveTxt:
                 gn = torch.tensor(image.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-                LOGGER.info(f"Saving results to {savePath}")
+                print(f"Saving results to {savePath}")
                 for *xyxy, conf, cls in reversed(newDet):
                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                     line = (cls, *xywh, conf)  # label format
                     with open(savePath, 'a') as f:
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
-            LOGGER.info(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
+            print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
             return image
         else:
             # Collecting all detections
             t1 = time_sync()
-            pred = self.model(tensorImg, augment=self.augment)
+            pred = self.model(tensorImg, augment=self.augment, visualize=visualize)
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
             detTimes = time_sync() - t1
             
@@ -469,15 +472,17 @@ class SHOP:
             
             # finally processing and filtering the detections
             for i, det in enumerate(pred):  # detections per image
-                # ensuring check boxes are ready for comparison and rescaled
-                
+                # ensuring check boxes and detections are ready for comparison and rescaled
                 checkBoxes = self.readyCheckBoxes(checkBoxes, img, image, self.device)  
-            
+                if len(det):
+                    # Rescale boxes from img_size to image size and same thing done for check boxes
+                    det[:, :4] = scale_coords(tensorImg.shape[2:], det[:, :4], image.shape).round()
+                
                 # filtering low confidence detections with areas of interest   
                 if (not allDet) and upperConfNotExceeded:
                     newDet = self.filterDet(checkBoxes, det, image, img, tensorImg, upper_conf_thres, overlap)
                 else:
-                    # if allDet is True, then it doesn't filter any detections as there is no need to
+                    # if allDet is True, then it doesn't filter any detections as there is no need to (still yeets non-handhelds though)
                     newDet = det if not handheld else [detection for detection in det if int(detection[5]) in HANDHELD_MAP]
                 
                 # removing non-handheld classes (COCO-specific setting)
@@ -493,14 +498,15 @@ class SHOP:
                     label = f'{self.names[c]} {conf:.2f}'
                     annotator.box_label(xyxy, label, color=colors(c, True))
             
-                # drawing out the check boxes and pose-estimators
-                i = 0
-                for *xyxy, conf, cls in reversed(checkBoxes):
-                    c = int(cls)
-                    if xyxy[3] - xyxy[1] > 0 and xyxy[2] - xyxy[0] > 0:
-                        #save_one_box(xyxy, imc, file=save_dir/ 'wrist_crops' / names[c] / f'{p.stem}.jpg', BGR=True, pad=0)
-                        annotator.box_label(xyxy, keypoints[i][-1], color=colors(c, True))
-                    i += 1
+                # drawing out the check boxes and pose-estimators if desired
+                if not noCheck:
+                    i = 0
+                    for *xyxy, conf, cls in reversed(checkBoxes):
+                        c = int(cls)
+                        if xyxy[3] - xyxy[1] > 0 and xyxy[2] - xyxy[0] > 0:
+                            #save_one_box(xyxy, imc, file=save_dir/ 'wrist_crops' / names[c] / f'{p.stem}.jpg', BGR=True, pad=0)
+                            annotator.box_label(xyxy, keypoints[i][-1], color=colors(c, True))
+                        i += 1
             
             # Drawing the pose-estimators if needed
             if not noPose and upperConfNotExceeded:
@@ -512,13 +518,13 @@ class SHOP:
             # Returning the annotated image and caching path if needed
             if saveTxt:
                 gn = torch.tensor(image.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-                LOGGER.info(f"Saving results to {savePath}")
+                print(f"Saving results to {savePath}")
                 for *xyxy, conf, cls in reversed(newDet):
                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                     line = (cls, *xywh, conf)  # label format
                     with open(savePath, 'a') as f:
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
-            LOGGER.info(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
+            print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s")
             return image
     
     
@@ -536,9 +542,6 @@ class SHOP:
         # if there are detections, then starts filtering them
         newDet = []
         if len(det):
-            # Rescale boxes from img_size to im0 size and same thing done for crops and check boxes
-            det[:, :4] = scale_coords(tensorImg.shape[2:], det[:, :4], im0.shape).round()
-
             # Check if any overlap between keypoint and checkBoxes (means object is handheld)
             for detection in det:
                 # if upper confidence threshold is satisfied, detection is accepted
@@ -762,20 +765,36 @@ class SHOP:
 
 
     """
-    This function takes an image and returns a tensor version ready for YOLOv5 and top-down pose-estimation
+    This function takes an image and returns a tensor version ready for YOLOv5 and top-down pose-estimation.
+    Depending on the settings, it may also deblur the image.
     """
     def preprocess(self,
                    image,
                    imgsz):
-        img = letterbox(image, new_shape=imgsz)[0]
-        img = np.ascontiguousarray(img.transpose((2, 0, 1)))
-        img = torch.from_numpy(img).to(self.device)
-        img = img.half() if self.half else img.float()
-        img = img / 255.0
-        if len(img.shape) == 3:
-            img = img[None]
-        return img
+        
+        # letterboxing the image
+        img = letterbox(image, imgsz, stride=self.stride)[0]
+        
+        # BGR to RGB transitioning
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        # running deblurring if noDeblur is off
+        if not self.noDeblur:
+            img = self.predictor(img, None)
 
+        #cv2.imwrite("butt.jpg", img)
+
+        # transposing image
+        Timg = np.ascontiguousarray(img.transpose((2, 0, 1)))
+            
+        # creating the torch tensor
+        Timg = torch.from_numpy(Timg).to(self.device)    
+        Timg = Timg.half() if self.half else Timg.float()
+        Timg = Timg / 255.0
+        if len(Timg.shape) == 3:
+            Timg = Timg[None]
+        return Timg, img 
+        
 
 # runs inference with desired options
 if __name__ == "__main__":
@@ -792,6 +811,7 @@ if __name__ == "__main__":
     parser.add_argument('--noDeblur', default=False, action='store_true', help='option for disabling deblur')
     parser.add_argument('--noElbow', default=False, action='store_true', help='option for disabling elbow check')
     parser.add_argument('--noPose', default=False, action='store_true', help='option for not showing pose')
+    parser.add_argument('--noCheck', default=False, action='store_true', help='option for not showing check boxes')
     parser.add_argument('--allDet', default=False, action='store_true', help='option for showing all detections')
     parser.add_argument('--poseNum', default=3, type=int, help='number of humans to swtich pose detections') 
     parser.add_argument('--overlap', default=0.25, type=float, help='amount of check overlap needed for check boxes') 
@@ -826,7 +846,7 @@ if __name__ == "__main__":
     parser.add_argument('--scales', type=str, default='[None]', help='for multiple scales, eg. [1.0, (1.1, 0.05)]')
     
     # Arguments for creating the top-down pose-estimator (if it needs to be created)
-    parser.add_argument('--det-model', type=str, default='checkpoints/crowdhuman_yolov5m.pt')
+    parser.add_argument('--det-model', type=str, default='yolov5/crowdhuman_yolov5m.pt')
     parser.add_argument('--pose-model', type=str, default='checkpoints/pretrained/simdr_hrnet_w32_256x192.pth')
     parser.add_argument('--person-conf-thres', type=float, default=0.4)
     parser.add_argument('--person-iou-thres', type=float, default=0.5)
@@ -843,4 +863,4 @@ if __name__ == "__main__":
                          opt.iou_thres, opt.noElbow, opt.noPose, opt.allDet, opt.overlap, opt.view_img,\
                          opt.save_txt, opt.save_conf, opt.save_crop, opt.nosave, opt.classes, opt.agnostic_nms,\
                          opt.visualize, opt.update, opt.exist_ok, opt.line_thickness, opt.hide_labels,\
-                         opt.hide_conf, opt.wsl, opt.imgsz, opt.max_det, opt.handheld)
+                         opt.hide_conf, opt.wsl, [opt.imgsz, opt.imgsz], opt.max_det, opt.handheld, opt.noCheck)
