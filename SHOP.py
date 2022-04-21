@@ -79,7 +79,7 @@ class SHOP:
             self.top_down = Pose(
                 det_model,
                 pose_model,
-                imgsz,
+                imgsz[0],
                 person_conf_thres,
                 person_iou_thres
             )
@@ -778,7 +778,7 @@ class SHOP:
                    imgsz):
         
         # letterboxing the image
-        img = letterbox(image, imgsz, stride=self.stride)[0]
+        img = letterbox(image, imgsz[0], stride=self.stride)[0]
         
         # BGR to RGB transitioning
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -810,7 +810,7 @@ if __name__ == "__main__":
     parser.add_argument('--project', default='./runs/', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')    
     # imgsz will be shared between the top-down detection model and the yolov5 object detector
-    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=640, help='inference size h,w')
+    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
     parser.add_argument('--upper-conf-thres', type=float, default=1.1, help='confidence threshold at which pipeline won\'t be applied')
     parser.add_argument('--wsl', default=False, action='store_true', help='if wsl is used then image not shown')
     parser.add_argument('--noDeblur', default=False, action='store_true', help='option for disabling deblur')
@@ -861,6 +861,7 @@ if __name__ == "__main__":
 
     # Getting parser arguments and calling the function
     opt = parser.parse_args()
+    print(opt.imgsz, type(opt.imgsz))
     shop = SHOP(opt.noDeblur, opt.poseNum, opt.weights, opt.data, opt.device, opt.half,\
                 opt.dnn, opt.model, opt.scales, opt.det_model, opt.pose_model, opt.weights_path,\
                 opt.person_iou_thres, opt.person_conf_thres, opt.imgsz, opt.augment)
@@ -868,4 +869,4 @@ if __name__ == "__main__":
                          opt.iou_thres, opt.noElbow, opt.noPose, opt.allDet, opt.overlap, opt.view_img,\
                          opt.save_txt, opt.save_conf, opt.save_crop, opt.nosave, opt.classes, opt.agnostic_nms,\
                          opt.visualize, opt.update, opt.exist_ok, opt.line_thickness, opt.hide_labels,\
-                         opt.hide_conf, opt.wsl, [opt.imgsz, opt.imgsz], opt.max_det, opt.handheld, opt.noCheck)
+                         opt.hide_conf, opt.wsl, opt.imgsz, opt.max_det, opt.handheld, opt.noCheck)
