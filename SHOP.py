@@ -21,8 +21,11 @@ from yolov5.utils.metrics import bbox_iou
 from DeblurGANv2.predict import Predictor
 
 # needed libraries for tf-pose-estimator
-from tf_pose_estimation.estimator import TfPoseEstimator
-from tf_pose_estimation.networks import get_graph_path
+try:
+    from tf_pose_estimation.estimator import TfPoseEstimator
+    from tf_pose_estimation.networks import get_graph_path
+except:
+    print("Pipeline being run from non-Linux environment")
 
 # needed libraries for top-down pose-estimator
 from pose_estimation.infer import Pose
@@ -366,6 +369,7 @@ class SHOP:
     """
     Takes an image as input and outputs an analyzed image for saving
     """
+    @torch.no_grad()
     def forward(self,
                 image,
                 imgsz,
@@ -601,10 +605,7 @@ class SHOP:
         # scaling and centering bounding boxes then predicting poses
         boxes = scale_boxes(det[:, :4], img.shape[:2], tensorImg.shape[-2:]).cpu()
         boxes = self.top_down.box_to_center_scale(boxes)
-        #print("\nAI Initialization Memory Allocation (GPU) Start", torch.cuda.memory_allocated(0) / 1000000000, "GB")
-        #print(boxes.shape)
         outputs = self.top_down.predict_poses(boxes, img)
-        #print("\nAI Initialization Memory Allocation (GPU) End", torch.cuda.memory_allocated(0) / 1000000000, "GB")
         
         # collecting final predictions for poses
         if 'simdr' in self.top_down.model_name:

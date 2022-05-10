@@ -3,7 +3,7 @@ import logging
 import time
 import ast
 
-import tf_pose_estimation.common
+import tf_pose_estimation.common as common
 import cv2
 import numpy as np
 from tf_pose_estimation.estimator import TfPoseEstimator

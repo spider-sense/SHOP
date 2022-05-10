@@ -11,6 +11,7 @@ scipy>=1.4.1
 torch>=1.7.0
 torchvision>=0.8.1
 tqdm>=4.41.0
+youtube_dl # youtube files downloading
 
 # Logging -------------------------------------
 tensorboard>=2.4.1
@@ -29,10 +30,9 @@ seaborn>=0.11.0
 # tensorflowjs>=3.9.0  # TF.js export
 # openvino-dev  # OpenVINO export
 
-# Extras --------------------------------------
+# Extras -------------------------------------
 # albumentations>=1.0.3
 # Cython  # for pycocotools https://github.com/cocodataset/cocoapi/issues/172
 # pycocotools>=2.0  # COCO mAP
 # roboflow
 thop  # FLOPs computation
-pytube # youtube files downloading

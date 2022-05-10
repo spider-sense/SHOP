@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Aug 16 02:45:31 2021
-@author: derph
-"""
-
 import numpy as np
 import os
 import cv2
@@ -168,7 +162,7 @@ def main(CONF_THRESH, det_label_dir, iou_thresh):
                             coco_matched[c] = True
                             matched = True
                             break
-            if not matched:                
+            if not matched:
                 fp[det_cat[i]] += 1
         
         for i in range(len(hh_cat)):
@@ -225,7 +219,7 @@ if __name__ == '__main__':
     # can only have specific size results be displayed
     for label in os.listdir(labelDir):
         # early exiting conditions
-        if label in ["handheld", "ground_truth", "allLabels.json"]:
+        if label in ["handheld", "ground_truth", "allLabels.json", "old"]:
             continue        
         
         # looking for existing stats else making new

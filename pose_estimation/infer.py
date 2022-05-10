@@ -49,6 +49,9 @@ class Pose:
             [16,14],[14,12],[17,15],[15,13],[12,13],[6,12],[7,13], [6,7],[6,8],
             [7,9],[8,10],[9,11],[2,3],[1,2],[1,3],[2,4],[3,5],[4,6],[5,7]
         ]
+        
+        print(self.device, det_model, pose_model, img_size, conf_thres, iou_thres)
+
 
     def preprocess(self, image):
         img = letterbox(image, new_shape=self.img_size)
@@ -77,6 +80,8 @@ class Pose:
             image_patches.append(img_patch)
 
         image_patches = torch.stack(image_patches).to(self.device)
+        
+        # Giving torch memory statistics if GPU device is used.
         return self.pose_model(image_patches)
 
     def postprocess(self, pred, img1, img0):
@@ -93,7 +98,7 @@ class Pose:
                 else:
                     coords = get_final_preds(outputs, boxes)
 
-                draw_keypoints(img0, coords, self.coco_skeletons)
+                draw_keypoints(img0, img0, coords, self.coco_skeletons)
 
     @torch.no_grad()
     def predict(self, image):
