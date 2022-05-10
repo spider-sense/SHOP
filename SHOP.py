@@ -2,10 +2,11 @@
 import argparse
 import os
 import cv2
-from pytube import YouTube
+import youtube_dl
 import numpy as np
 import torch
 from tqdm import tqdm
+import json
 
 # needed libraries for YOLOv5
 from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS
@@ -89,7 +90,10 @@ class SHOP:
             dim = [int(i) for i in model.split("_")[-1].split("x")]
             w, h = dim[0], dim[1]
             self.bottom_up = TfPoseEstimator(get_graph_path(model), target_size=(w, h))
-            
+        
+        # Giving torch memory statistics if GPU device is used.
+        if str(self.device) == "cuda:0":
+            print("\nAI Initialization Memory Allocation (GPU)", torch.cuda.memory_allocated(0) / 1000000000, "GB")
     
     """
     Inference function to actually run an AI prediction on the image
@@ -105,24 +109,18 @@ class SHOP:
               noPose,
               allDet,
               overlap,
-              view_img,
               save_txt,
-              save_conf,
-              save_crop,
               nosave,
               classes,
               agnostic_nms,
               visualize,
-              update,
-              exist_ok,
               line_thickness,
-              hide_labels,
-              hide_conf,
               wsl,
               imgsz,
               max_det,
               handheld,
-              noCheck):        
+              noCheck,
+              saveAOI):        
         # Checking and verifying source type
         isDir = os.path.isdir(source)
         isIm = os.path.isfile(source) and source.split(".")[-1] in IMG_FORMATS
@@ -145,20 +143,27 @@ class SHOP:
         # Loading image size settings
         imgsz = check_img_size(imgsz, s=self.stride)  # check image size
         
+        # creating pose saving cache if needed
+        poseSave = {}
+        
         # image analysis perform
         if isIm:
             # loads the image
             img = cv2.imread(source)
             
             # analyzes the image
-            img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
+            img, checkBoxes = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                allDet, overlap, noPose, noElbow, os.path.splitext(savePath)[0] + ".txt", save_txt, noCheck, visualize)
-            
+               
+            # saving area of interest if needed
+            if saveAOI:
+                checkBoxes = [box.tolist() for box in checkBoxes]
+                poseSave[source] = checkBoxes
+                
             # saves the image's analysis to the project folder as long as nosave not enabled
             if not nosave:
                 print(f"Saving image to {savePath}")
                 cv2.imwrite(savePath, img)
-            return
             
         # directory of images analysis perform
         if isDir:
@@ -180,14 +185,18 @@ class SHOP:
                     cachePath = os.path.join(cacheDir, os.path.splitext(image)[0]) + ".txt"
                     
                     # analyzing the image
-                    img = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
+                    img, checkBoxes = self.forward(img, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
                     
+                    # saving AOI if needed
+                    if saveAOI:
+                        checkBoxes = [box.tolist() for box in checkBoxes]
+                        poseSave[image] = checkBoxes
+                        
                     # saves the image's analysis to the project folder
                     if not nosave:
                         print(f"Saving image to {savePath}")
                         cv2.imwrite(savePath + "/" + image, img)
-            return
                 
         # video analysis perform
         if isVid:
@@ -219,8 +228,13 @@ class SHOP:
                 
                 if ret:
                     # analyzing the image
-                    img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
+                    img, checkBoxes = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
+                    
+                    # saving AOI if needed
+                    if saveAOI:
+                        checkBoxes = [box.tolist() for box in checkBoxes]
+                        poseSave[frameTrack] = checkBoxes
                     
                     if not nosave:
                         # saves image to video writer if enabled
@@ -230,7 +244,6 @@ class SHOP:
             if not nosave:
                 out.release()
             cam.release()
-            return
         
         # webcam analysis perform
         if isWeb:
@@ -265,9 +278,14 @@ class SHOP:
                 cv2.imshow("webcam frame", ret)
                 if not (cv2.waitKey(1) & 0xFF == ord(' ')):
                     # analyzing the image
-                    img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
+                    img, checkBoxes = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
                     
+                    # saving to pose cache if needed
+                    if saveAOI:
+                        checkBoxes = [box.tolist() for box in checkBoxes]
+                        poseSave[frameTrack] = checkBoxes
+                        
                     if not nosave:
                         # saves image to video writer
                         out.write(img)
@@ -281,10 +299,11 @@ class SHOP:
         if isYouTube:
             # saving the youtube video
             print("downloading the youtube video")
-            savePath = projectFolder
-            yt = YouTube(source)
-            yt.streams.get_by_itag(22).download(output_path=savePath, filename="video.mp4")
-            
+            savePath = projectFolder            
+            ydl = youtube_dl.YoutubeDL({'outtmpl': savePath + "video.mp4"})
+            with ydl:
+                ydl.download([source])
+
             # creating cacheDir
             cacheDir = os.path.join(projectFolder, "detections")
             
@@ -317,9 +336,14 @@ class SHOP:
                 # not feasible to run with webcam on wsl
                 if ret:
                     # analyzing the image
-                    img = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
+                    img, checkBoxes = self.forward(frame, imgsz, upper_conf_thres, conf_thres, iou_thres, classes, agnostic_nms, max_det, line_thickness, handheld,\
                                        allDet, overlap, noPose, noElbow, cachePath, save_txt, noCheck, visualize)
                     
+                    # saving to pose cache if needed
+                    if saveAOI:
+                        checkBoxes = [box.tolist() for box in checkBoxes]
+                        poseSave[frameTrack] = checkBoxes
+                        
                     if not nosave:
                         # saves image to video writer
                         out.write(img)
@@ -329,6 +353,11 @@ class SHOP:
                 out.release()
             cam.release()
             
+        # saving pose cache if needed
+        if saveAOI:
+            with open(os.path.join(projectFolder, "poseCache" + str(self.poseNum) + ".json"), 'w') as file:
+                file.write(json.dumps(poseSave))
+        
         # printing out final save path
         if isYouTube:
             print(f"Saving to {savePath}")
@@ -361,19 +390,19 @@ class SHOP:
         full = time_sync()
         
         # running preprocessing
-        tensorImg, img = self.preprocess(image, imgsz)
+        tensorImg, img, bgrImg = self.preprocess(image, imgsz)
         deblurTime = time_sync() - t0
-        
+           
         # keypoints found first if upper confidence threshold > 1
         if upper_conf_thres > 1:
             # collecting pose keypoints, center keypoints + distances, and which pose-estimator was used
             t1 = time_sync()
-            keypoints, humans, Openpose = self.getKeyPoints(img, tensorImg, noElbow)
+            keypoints, humans, Openpose = self.getKeyPoints(img, bgrImg, tensorImg, noElbow)
             
             # early exits if no keypoints were found
             if len(keypoints) == 0:
                 print("lack of keypoints causes early exit")
-                return image
+                return image, []
             
             # now collects the check boxes
             checkBoxes = [self.getCropBoxes(point[0], img, INNER_RATIO, self.device, point[1], Openpose) for point in keypoints]        
@@ -389,42 +418,7 @@ class SHOP:
             t3 = time_sync()
 
             # process and filter the detections
-            for i, det in enumerate(pred):  # detections per image
-                # ensuring check boxes and detections are ready for comparison and rescaled
-                checkBoxes = self.readyCheckBoxes(checkBoxes, img, image, self.device)  
-                if len(det):
-                    # Rescale boxes from img_size to image size and same thing done for check boxes
-                    det[:, :4] = scale_coords(tensorImg.shape[2:], det[:, :4], image.shape).round()
-            
-                # filtering low confidence detections with areas of interest   
-                if not allDet:
-                    newDet = self.filterDet(checkBoxes, det, image, img, tensorImg, upper_conf_thres, overlap)
-                else:
-                    # if allDet is True, then it doesn't filter any detections as there is no need to
-                    newDet = det
-
-                # removing non-handheld classes (COCO-specific setting)
-                if handheld:
-                    newDet = [i for i in newDet if int(i[5]) in HANDHELD_MAP]
-                
-                # creating the annotation tool
-                annotator = Annotator(image, line_width=line_thickness, example=str(self.names))
-                
-                # drawing out the desired detections
-                for *xyxy, conf, cls in reversed(newDet):
-                    c = int(cls)  # integer class
-                    label = f'{self.names[c]} {conf:.2f}'
-                    annotator.box_label(xyxy, label, color=colors(c, True))
-            
-                # drawing out the check boxes and pose-estimators if noCheck disabled
-                if not noCheck:
-                    i = 0
-                    for *xyxy, conf, cls in reversed(checkBoxes):
-                        c = int(cls)
-                        if xyxy[3] - xyxy[1] > 0 and xyxy[2] - xyxy[0] > 0:
-                            #save_one_box(xyxy, imc, file=save_dir/ 'wrist_crops' / names[c] / f'{p.stem}.jpg', BGR=True, pad=0)
-                            annotator.box_label(xyxy, keypoints[i][-1], color=colors(c, True))
-                        i += 1
+            newDet, checkBoxes = self.postprocess(pred, checkBoxes, img, image, tensorImg, handheld, allDet, upper_conf_thres, overlap, line_thickness, noCheck, keypoints)
             
             # Drawing the pose-estimators if needed
             if not noPose:
@@ -443,7 +437,7 @@ class SHOP:
                     with open(savePath, 'a') as f:
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
             print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | AOI Gen.: {aoiTime:.3f}s | Detection: {detTimes:.3f}s | Postprocessing {time_sync()-t3:.3f}s")
-            return image
+            return image, checkBoxes
         else:
             # Collecting all detections
             t1 = time_sync()
@@ -463,55 +457,21 @@ class SHOP:
             t2 = time_sync()
             if upperConfNotExceeded:
                 # collecting keypoints
-                keypoints, humans, Openpose = self.getKeyPoints(img, tensorImg, noElbow)
+                keypoints, humans, Openpose = self.getKeyPoints(img, bgrImg, tensorImg, noElbow)
                 
                 # now collecting the check boxes
                 checkBoxes = [self.getCropBoxes(point[0], img, INNER_RATIO, self.device, point[1], Openpose) for point in keypoints]        
             else:
                 # zero areas of interest need to be collected in this case
                 checkBoxes = []
+                keypoints = []
             aoiTime = time_sync() - t2
             
             # starts timing the post-processing and annotating
             t3 = time_sync()
 
             # finally processing and filtering the detections
-            for i, det in enumerate(pred):  # detections per image
-                # ensuring check boxes and detections are ready for comparison and rescaled
-                checkBoxes = self.readyCheckBoxes(checkBoxes, img, image, self.device)  
-                if len(det):
-                    # Rescale boxes from img_size to image size and same thing done for check boxes
-                    det[:, :4] = scale_coords(tensorImg.shape[2:], det[:, :4], image.shape).round()
-                
-                # filtering low confidence detections with areas of interest   
-                if (not allDet) and upperConfNotExceeded:
-                    newDet = self.filterDet(checkBoxes, det, image, img, tensorImg, upper_conf_thres, overlap)
-                else:
-                    # if allDet is True, then it doesn't filter any detections as there is no need to (still yeets non-handhelds though)
-                    newDet = det if not handheld else [detection for detection in det if int(detection[5]) in HANDHELD_MAP]
-                
-                # removing non-handheld classes (COCO-specific setting)
-                if handheld:
-                    newDet = [i for i in newDet if int(i[5]) in HANDHELD_MAP]
-                
-                # creating the annotation tool
-                annotator = Annotator(image, line_width=line_thickness, example=str(self.names))
-                
-                # drawing out the desired detections
-                for *xyxy, conf, cls in reversed(newDet):
-                    c = int(cls)  # integer class
-                    label = f'{self.names[c]} {conf:.2f}'
-                    annotator.box_label(xyxy, label, color=colors(c, True))
-            
-                # drawing out the check boxes and pose-estimators if desired
-                if not noCheck:
-                    i = 0
-                    for *xyxy, conf, cls in reversed(checkBoxes):
-                        c = int(cls)
-                        if xyxy[3] - xyxy[1] > 0 and xyxy[2] - xyxy[0] > 0:
-                            #save_one_box(xyxy, imc, file=save_dir/ 'wrist_crops' / names[c] / f'{p.stem}.jpg', BGR=True, pad=0)
-                            annotator.box_label(xyxy, keypoints[i][-1], color=colors(c, True))
-                        i += 1
+            newDet, checkBoxes = self.postprocess(pred, checkBoxes, img, image, tensorImg, handheld, allDet, upper_conf_thres, overlap, line_thickness, noCheck, keypoints)
             
             # Drawing the pose-estimators if needed
             if not noPose and upperConfNotExceeded:
@@ -530,7 +490,7 @@ class SHOP:
                     with open(savePath, 'a') as f:
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
             print(f"Full Exec.: {time_sync()-full:.3f}s | Preprocessing: {deblurTime:.3f}s | Detection: {detTimes:.3f}s | AOI Gen.: {aoiTime:.3f}s | Postprocessing: {time_sync()-t3:.3f}")
-            return image
+            return image, checkBoxes
     
     
     """
@@ -552,6 +512,7 @@ class SHOP:
                 # if upper confidence threshold is satisfied, detection is accepted
                 if detection[-2] >= upper_conf_thres:
                     newDet.append(detection)
+                    continue
                 # if low confidence detection, then checks if it properly overlaps with area of interest
                 for check in checkBoxes:
                     # checking if detection sufficiently overlaps with area of interest
@@ -604,16 +565,17 @@ class SHOP:
     """
     def getKeyPoints(self,
                      img,
+                     bgrImg,
                      tensorImg,
                      noElbow):
         # running only bottom up pose-estimator in this situation
         if self.poseNum == 0:
-            return self.bottomUp(img, noElbow)
+            return self.bottomUp(bgrImg, noElbow)
         else:
             # otherwise determining the number of people present in the image
             pred = self.top_down.det_model(tensorImg)[0]
             pred = non_max_suppression(pred, self.top_down.conf_thres, self.top_down.iou_thres, classes=0)
-        
+            
             # determining pose-estimator ran based on number of people and poseNum threshold
             for det in pred:
                 pplCount = len(det)
@@ -626,7 +588,7 @@ class SHOP:
                 if self.poseNum == -1 or pplCount <= self.poseNum:
                     return self.topDown(img, tensorImg, det)
                 else:
-                    return self.bottomUp(img, noElbow)
+                    return self.bottomUp(bgrImg, noElbow)
     
     
     """
@@ -639,7 +601,10 @@ class SHOP:
         # scaling and centering bounding boxes then predicting poses
         boxes = scale_boxes(det[:, :4], img.shape[:2], tensorImg.shape[-2:]).cpu()
         boxes = self.top_down.box_to_center_scale(boxes)
+        #print("\nAI Initialization Memory Allocation (GPU) Start", torch.cuda.memory_allocated(0) / 1000000000, "GB")
+        #print(boxes.shape)
         outputs = self.top_down.predict_poses(boxes, img)
+        #print("\nAI Initialization Memory Allocation (GPU) End", torch.cuda.memory_allocated(0) / 1000000000, "GB")
         
         # collecting final predictions for poses
         if 'simdr' in self.top_down.model_name:
@@ -677,7 +642,7 @@ class SHOP:
     
     
     """
-    Collecting the bottom-up pose-estimator keypoints
+    Collecting the bottom-up pose-estimator keypoints using bgr image
     """
     def bottomUp(self,
                  img,
@@ -770,6 +735,50 @@ class SHOP:
 
 
     """
+    This function runs all of the logical post-processing of the detections and draws them onto the image if needed
+    """
+    def postprocess(self, pred, checkBoxes, img, image, tensorImg, handheld, allDet, upper_conf_thres, overlap, line_thickness, noCheck, keypoints):
+        # process and filter the detections
+        for i, det in enumerate(pred):  # detections per image
+            # ensuring check boxes and detections are ready for comparison and rescaled
+            checkBoxes = self.readyCheckBoxes(checkBoxes, img, image, self.device)  
+            newDet = []
+            if len(det):
+                # Rescale boxes from img_size to image size and same thing done for check boxes
+                det[:, :4] = scale_coords(tensorImg.shape[2:], det[:, :4], image.shape).round()
+        
+                # filtering out non-handhelds if needed
+                det = det if not handheld else [detection for detection in det if int(detection[5]) in HANDHELD_MAP]
+            
+                # filtering low confidence detections with areas of interest if allDet is disabled
+                if allDet:
+                    newDet = det
+                else:
+                    newDet = self.filterDet(checkBoxes, det, image, img, tensorImg, upper_conf_thres, overlap)
+
+
+            # creating the annotation tool
+            annotator = Annotator(image, line_width=line_thickness, example=str(self.names))
+            
+            # drawing out the desired detections
+            for *xyxy, conf, cls in reversed(newDet):
+                c = int(cls)  # integer class
+                label = f'{self.names[c]} {conf:.2f}'
+                annotator.box_label(xyxy, label, color=colors(c, True))
+        
+            # drawing out the check boxes and pose-estimators if noCheck disabled
+            if not noCheck:
+                i = 0
+                for *xyxy, conf, cls in reversed(checkBoxes):
+                    c = int(cls)
+                    if xyxy[3] - xyxy[1] > 0 and xyxy[2] - xyxy[0] > 0:
+                        #save_one_box(xyxy, imc, file=save_dir/ 'wrist_crops' / names[c] / f'{p.stem}.jpg', BGR=True, pad=0)
+                        annotator.box_label(xyxy, keypoints[i][-1], color=colors(c, True))
+                    i += 1
+
+        return newDet, checkBoxes
+
+    """
     This function takes an image and returns a tensor version ready for YOLOv5 and top-down pose-estimation.
     Depending on the settings, it may also deblur the image.
     """
@@ -780,14 +789,15 @@ class SHOP:
         # letterboxing the image
         img = letterbox(image, imgsz[0], stride=self.stride)[0]
         
-        # BGR to RGB transitioning
+        # BGR to RGB transitioning and storing bgrImg
+        bgrImg = img
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
         # running deblurring if noDeblur is off
         if not self.noDeblur:
             img = self.predictor(img, None)
-
-        #cv2.imwrite("butt.jpg", img)
+            # recreating bgr image for bottom-up pose-estimator if deblurring was done
+            bgrImg = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         # transposing image
         Timg = np.ascontiguousarray(img.transpose((2, 0, 1)))
@@ -798,7 +808,7 @@ class SHOP:
         Timg = Timg / 255.0
         if len(Timg.shape) == 3:
             Timg = Timg[None]
-        return Timg, img 
+        return Timg, img, bgrImg 
         
 
 # runs inference with desired options
@@ -821,6 +831,7 @@ if __name__ == "__main__":
     parser.add_argument('--poseNum', default=3, type=int, help='number of humans to swtich pose detections') 
     parser.add_argument('--overlap', default=0.25, type=float, help='amount of check overlap needed for check boxes') 
     parser.add_argument('--handheld', default=False, action='store_true', help='if wsl is used then image not shown')
+    parser.add_argument('--saveAOI', default=False, action='store_true', help='if wsl is used then image not shown')
 
     # Arguments for creating the yolov5 object detector
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5/yolov5s.pt', help='model path(s)')
@@ -829,17 +840,13 @@ if __name__ == "__main__":
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--view-img', action='store_true', help='show results')
     parser.add_argument('--save-txt', action='store_true', help='save results to *.txt')
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
-    parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')
     parser.add_argument('--nosave', action='store_true', help='do not save images/videos')
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--visualize', action='store_true', help='visualize features')
-    parser.add_argument('--update', action='store_true', help='update all models')
-    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
     parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
@@ -854,19 +861,18 @@ if __name__ == "__main__":
     parser.add_argument('--det-model', type=str, default='yolov5/crowdhuman_yolov5m.pt')
     parser.add_argument('--pose-model', type=str, default='checkpoints/pretrained/simdr_hrnet_w32_256x192.pth')
     parser.add_argument('--person-conf-thres', type=float, default=0.4)
-    parser.add_argument('--person-iou-thres', type=float, default=0.5)
+    parser.add_argument('--person-iou-thres', type=float, default=0.45)
     
     # Arguments for creating the deblurrer (if it needs to be made)
     parser.add_argument('--weights_path', type=str, default='best_fpn.h5')
 
     # Getting parser arguments and calling the function
     opt = parser.parse_args()
-    print(opt.imgsz, type(opt.imgsz))
+
     shop = SHOP(opt.noDeblur, opt.poseNum, opt.weights, opt.data, opt.device, opt.half,\
                 opt.dnn, opt.model, opt.scales, opt.det_model, opt.pose_model, opt.weights_path,\
                 opt.person_iou_thres, opt.person_conf_thres, opt.imgsz, opt.augment)
     testOut = shop.infer(opt.source, opt.project, opt.name, opt.conf_thres, opt.upper_conf_thres,\
-                         opt.iou_thres, opt.noElbow, opt.noPose, opt.allDet, opt.overlap, opt.view_img,\
-                         opt.save_txt, opt.save_conf, opt.save_crop, opt.nosave, opt.classes, opt.agnostic_nms,\
-                         opt.visualize, opt.update, opt.exist_ok, opt.line_thickness, opt.hide_labels,\
-                         opt.hide_conf, opt.wsl, opt.imgsz, opt.max_det, opt.handheld, opt.noCheck)
+                         opt.iou_thres, opt.noElbow, opt.noPose, opt.allDet, opt.overlap, opt.save_txt,\
+                         opt.nosave, opt.classes, opt.agnostic_nms, opt.visualize, opt.line_thickness,\
+                         opt.wsl, opt.imgsz, opt.max_det, opt.handheld, opt.noCheck, opt.saveAOI)
