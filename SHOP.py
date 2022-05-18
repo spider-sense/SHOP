@@ -605,10 +605,7 @@ class SHOP:
         # scaling and centering bounding boxes then predicting poses
         boxes = scale_boxes(det[:, :4], img.shape[:2], tensorImg.shape[-2:]).cpu()
         boxes = self.top_down.box_to_center_scale(boxes)
-        print("\nAI Initialization Memory Allocation (GPU) Start", torch.cuda.memory_allocated(0) / 1000000000, "GB")
-        print("ppl count", len(boxes))
         outputs = self.top_down.predict_poses(boxes, img)
-        print("\nAI Initialization Memory Allocation (GPU) End", torch.cuda.memory_allocated(0) / 1000000000, "GB")
         
         # collecting final predictions for poses
         if 'simdr' in self.top_down.model_name:
@@ -872,6 +869,10 @@ if __name__ == "__main__":
 
     # Getting parser arguments and calling the function
     opt = parser.parse_args()
+
+    # making runs directory if needed
+    if not os.path.isdir("runs"):
+        os.mkdir("runs")
 
     shop = SHOP(opt.noDeblur, opt.poseNum, opt.weights, opt.data, opt.device, opt.half,\
                 opt.dnn, opt.model, opt.scales, opt.det_model, opt.pose_model, opt.weights_path,\
