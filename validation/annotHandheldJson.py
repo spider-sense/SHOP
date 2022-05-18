@@ -8,16 +8,17 @@ Created on Fri Jan 14 01:06:40 2022
 import os
 import json
 
-labels = os.listdir("labels")
+labelDir = "labels"
+labels = os.listdir(labelDir)
 allLabels = {}
 for name in labels:
     print(name)
-    if name == "allLabels.json":
+    if name in ["allLabels.json", "ignore"]:
         continue
     handJson = {}
-    handDir = os.listdir("./labels/" + name)
+    handDir = os.listdir("./" + labelDir + "/" + name)
     for hand in handDir:
-        with open("./labels/" + name + "/" + hand, 'r') as file:
+        with open("./" + labelDir + "/" + name + "/" + hand, 'r') as file:
             data = [[float(i) for i in row.split(" ")] for row in file.read().split("\n") if row != ""]
             handJson[hand] = data
     allLabels[name] = handJson

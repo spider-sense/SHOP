@@ -25,7 +25,7 @@ try:
     from tf_pose_estimation.estimator import TfPoseEstimator
     from tf_pose_estimation.networks import get_graph_path
 except:
-    print("Pipeline being run from non-Linux environment")
+    print("Pipeline being run from non-Linux environment. Bottom-Up pose estimation is blocked!")
 
 # needed libraries for top-down pose-estimator
 from pose_estimation.infer import Pose
@@ -101,6 +101,7 @@ class SHOP:
     """
     Inference function to actually run an AI prediction on the image
     """
+    @torch.no_grad()
     def infer(self, 
               source,
               project,
@@ -369,7 +370,6 @@ class SHOP:
     """
     Takes an image as input and outputs an analyzed image for saving
     """
-    @torch.no_grad()
     def forward(self,
                 image,
                 imgsz,
@@ -605,7 +605,10 @@ class SHOP:
         # scaling and centering bounding boxes then predicting poses
         boxes = scale_boxes(det[:, :4], img.shape[:2], tensorImg.shape[-2:]).cpu()
         boxes = self.top_down.box_to_center_scale(boxes)
+        print("\nAI Initialization Memory Allocation (GPU) Start", torch.cuda.memory_allocated(0) / 1000000000, "GB")
+        print("ppl count", len(boxes))
         outputs = self.top_down.predict_poses(boxes, img)
+        print("\nAI Initialization Memory Allocation (GPU) End", torch.cuda.memory_allocated(0) / 1000000000, "GB")
         
         # collecting final predictions for poses
         if 'simdr' in self.top_down.model_name:
@@ -613,6 +616,7 @@ class SHOP:
         else:
             coords = get_final_preds(outputs, boxes)    
         humans = coords
+        print("\nAI Initialization Memory Allocation (GPU) True End", torch.cuda.memory_allocated(0) / 1000000000, "GB")
         
         # if no predictions could be found, then returns no keypoints
         if humans is None:
@@ -786,7 +790,6 @@ class SHOP:
     def preprocess(self,
                    image,
                    imgsz):
-        
         # letterboxing the image
         img = letterbox(image, imgsz[0], stride=self.stride)[0]
         

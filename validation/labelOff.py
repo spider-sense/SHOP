@@ -219,14 +219,14 @@ if __name__ == '__main__':
     # can only have specific size results be displayed
     for label in os.listdir(labelDir):
         # early exiting conditions
-        if label in ["handheld", "ground_truth", "allLabels.json", "old"]:
+        if label in ["handheld", "ground_truth", "allLabels.json", "ignore"]:
             continue        
         
         # looking for existing stats else making new
         if not os.path.isdir("./" + labelDir + "/" + label + "/"):
             continue
-        if os.path.isfile("testRes/" + label + ".json"):
-            with open("testRes/" + label + ".json", 'r') as file:
+        if os.path.isfile(labelDir + "TestRes/" + label + ".json"):
+            with open(labelDir + "TestRes/" + label + ".json", 'r') as file:
                 scatter = json.loads(file.read())
             scatter1 = scatter[0]
             scatter2 = scatter[1]
@@ -245,7 +245,7 @@ if __name__ == '__main__':
             tpTracks = [i[2] for i in scatter]
             
             scatter = [scatter1, scatter2, tpTracks]
-            with open("testRes/" + label + ".json", 'w') as file:
+            with open(labelDir + "TestRes/" + label + ".json", 'w') as file:
                 file.write(json.dumps(scatter))
                 
         # scattering annotation plots and mAP

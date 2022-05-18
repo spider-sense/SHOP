@@ -85,7 +85,7 @@ class Pose:
         return self.pose_model(image_patches)
 
     def postprocess(self, pred, img1, img0):
-        pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, classes=0)
+        #pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, classes=0)
 
         for det in pred:
             if len(det):
@@ -98,7 +98,8 @@ class Pose:
                 else:
                     coords = get_final_preds(outputs, boxes)
 
-                draw_keypoints(img0, img0, coords, self.coco_skeletons)
+                    return coords                
+                    #draw_keypoints(img0, img0, coords, self.coco_skeletons)
 
     @torch.no_grad()
     def predict(self, image):
