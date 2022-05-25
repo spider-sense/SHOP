@@ -404,7 +404,7 @@ class SHOP:
             keypoints, humans, Openpose = self.getKeyPoints(img, bgrImg, tensorImg, noElbow)
             
             # early exits if no keypoints were found
-            if len(keypoints) == 0:
+            if not allDet and len(keypoints) == 0:
                 print("lack of keypoints causes early exit")
                 return image, []
             
