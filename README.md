@@ -1,7 +1,7 @@
 # SHOP
 Repo containing code + dataset for Small Handheld Object Pipeline (SHOP).
 
-- Paper [[arxiv](https://arxiv.org/abs/2203.15228)]
+- Paper [[arxiv](https://arxiv.org/abs/2203.15228)] [[IEEE Xplore](https://ieeexplore.ieee.org/document/9763890)] [[doi](https://doi.org/10.1109/SoutheastCon48659.2022.9763890)]
 - [SHOP dataset](https://github.com/spider-sense/SHOP/releases/tag/0.1.0)
 - [Models and test results](https://drive.google.com/drive/u/0/folders/1DbA9OkVI6kw_TNvhMKQHpfm8U9v0gzC8) (to recreate results)
 - Handheld dataset creation program [<a href="https://github.com/spider-sense/handheld-classification">source code</a>] 
@@ -27,7 +27,7 @@ conda env create -f environment_windows.yml
 The `--depth 1` flag is recommended to reduce git clone size.
 
 ## Inference
-After installing, you will need to move the weights inside our [drive folder](https://drive.google.com/drive/u/0/folders/1DbA9OkVI6kw_TNvhMKQHpfm8U9v0gzC8) to the correct locations in your SHOP repo.
+After installing, you will need to move the weights inside our [drive folder](https://drive.google.com/drive/u/0/folders/1DbA9OkVI6kw_TNvhMKQHpfm8U9v0gzC8) to the correct locations in your SHOP repo (see the command below for the locations to place each model's weights in).
 
 After this, you are ready to run our pipeline! Run one of the following commands depending on your OS and cross-reference with our results on drive to make sure everything's running smoothly.
 
