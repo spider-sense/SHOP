@@ -44,7 +44,7 @@ Requirements:
 
 To replicate our results in the paper, you may have to take a few more steps.
 
-Download the labels and blurLabels directory to the validation directory in your repo then extract all of the zips inside these directories. Additionally, download the images and blurImages zip and extract its contents into the validation directory.
+Download and extract the labels and blurLabels zips to the validation directory in your repo. Additionally, download the images and blurImages zip and extract its contents into the validation directory.
 
 After this, you are ready to generate results!
 

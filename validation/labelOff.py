@@ -22,7 +22,7 @@ if not os.path.isfile(labelDir + "results.json"):
         file.write(json.dumps({}))
 
 # creating folder for storing test results if needed
-if not os.isdir(labelDir + "TestRes/"):
+if not os.path.isdir(labelDir + "TestRes/"):
     os.mkdir(labelDir + "TestRes/")
 
 def xywhn2xyxy(x, w=640, h=640, padw=0, padh=0):
