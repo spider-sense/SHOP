@@ -136,4 +136,5 @@ dependencies:
     - werkzeug==2.0.2
     - wrapt==1.13.3
     - zipp==3.7.0
+    - youtube_dl==2021.12.17
 prefix: /home/shivonmyniv/miniconda3/envs/SHOP-Linux

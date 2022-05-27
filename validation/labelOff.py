@@ -21,6 +21,10 @@ if not os.path.isfile(labelDir + "results.json"):
     with open(labelDir + "results.json", 'w') as file:
         file.write(json.dumps({}))
 
+# creating folder for storing test results if needed
+if not os.isdir(labelDir + "TestRes/"):
+    os.mkdir(labelDir + "TestRes/")
+
 def xywhn2xyxy(x, w=640, h=640, padw=0, padh=0):
     # Convert nx4 boxes from [x, y, w, h] normalized to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)

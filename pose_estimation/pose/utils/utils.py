@@ -36,10 +36,10 @@ def draw_keypoints(img, letterboxImg, keypoints, skeletons):
     heightFactor = img.shape[0] / letterboxImg.shape[0]
     for kpts in keypoints:
         for x, y in kpts:
-            cv2.circle(img, (round(x*widthFactor), round(y*heightFactor)), 4, (255, 0, 0), 2, cv2.LINE_AA)
+            cv2.circle(img, (int(round(x*widthFactor)), int(round(y*heightFactor))), 4, (255, 0, 0), 2, cv2.LINE_AA)
         for kid1, kid2 in skeletons:
-            kid1Kpt = [round(kpts[kid1-1][0]*widthFactor), round(kpts[kid1-1][1]*heightFactor)]
-            kid2Kpt = [round(kpts[kid2-1][0]*widthFactor), round(kpts[kid2-1][1]*heightFactor)]
+            kid1Kpt = [int(round(kpts[kid1-1][0]*widthFactor)), int(round(kpts[kid1-1][1]*heightFactor))]
+            kid2Kpt = [int(round(kpts[kid2-1][0]*widthFactor)), int(round(kpts[kid2-1][1]*heightFactor))]
             cv2.line(img, kid1Kpt, kid2Kpt, (0, 255, 0), 2, cv2.LINE_AA)   
 
 

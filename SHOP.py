@@ -304,7 +304,7 @@ class SHOP:
             # saving the youtube video
             print("downloading the youtube video")
             savePath = projectFolder            
-            ydl = youtube_dl.YoutubeDL({'outtmpl': savePath + "video.mp4"})
+            ydl = youtube_dl.YoutubeDL({'outtmpl': savePath + "video"})
             with ydl:
                 ydl.download([source])
 
@@ -313,7 +313,7 @@ class SHOP:
             
             # now analyzing the youtube video
             print("analyzing the youtube video")
-            cam = cv2.VideoCapture(savePath + "video.mp4")
+            cam = cv2.VideoCapture(savePath + "video.mkv")
             savePath = projectFolder + "analyzedVideo.mp4"
             imageWidth = int(cam.get(3))
             imageHeight = int(cam.get(4))
@@ -613,7 +613,6 @@ class SHOP:
         else:
             coords = get_final_preds(outputs, boxes)    
         humans = coords
-        print("\nAI Initialization Memory Allocation (GPU) True End", torch.cuda.memory_allocated(0) / 1000000000, "GB")
         
         # if no predictions could be found, then returns no keypoints
         if humans is None:

@@ -1,4 +1,4 @@
-name: Spider-Sense
+name: SHOP-Windows
 channels:
   - pytorch
   - anaconda
@@ -220,8 +220,6 @@ dependencies:
   - spyder=5.1.5
   - spyder-kernels=2.1.3
   - sqlite=3.36.0
-  - tensorflow=2.3.0
-  - tensorflow-base=2.3.0
   - termcolor=1.1.0
   - testpath=0.5.0
   - text-unidecode=1.3
@@ -257,7 +255,6 @@ dependencies:
   - yaml=0.2.5
   - yapf=0.31.0
   - yarl=1.6.3
-  - youtube-dl=2021.6.6
   - zfp=0.5.5
   - zipp=3.6.0
   - zlib=1.2.11
@@ -281,7 +278,7 @@ dependencies:
     - jsonpointer==2.1
     - mpmath==1.2.1
     - munch==2.5.0
-    - numpy==1.21.1
+    - numpy==1.18.5
     - onnx==1.10.0
     - onnx-simplifier==0.3.6
     - onnxoptimizer==0.2.6
@@ -289,7 +286,6 @@ dependencies:
     - opencv-contrib-python==4.5.3.56
     - opencv-python==4.5.3.56
     - opencv-python-headless==4.5.3.56
-    - openpose-pytorch==0.1.0
     - pafy==0.5.5
     - pathtools==0.1.2
     - pretrainedmodels==0.7.4
@@ -308,11 +304,6 @@ dependencies:
     - ssim==0.3.0
     - subprocess32==3.5.4
     - sympy==1.8
-    - tensorboard==2.5.0
-    - tensorboard-data-server==0.6.1
-    - tensorboard-plugin-wit==1.8.0
-    - tensorboardx==2.4
-    - tensorflow-estimator==2.3.0
     - thop==0.0.31-2005241907
     - torchfile==0.1.0
     - torchsummary==1.5.1
@@ -322,4 +313,5 @@ dependencies:
     - websocket-client==1.1.0
     - werkzeug==2.0.1
     - yacs==0.1.8
-prefix: C:\Users\derph\Miniconda3\envs\Spider-Sense
+    - youtube_dl==2021.12.17
+prefix: C:\Users\derph\Miniconda3\envs\SHOP-Windows
